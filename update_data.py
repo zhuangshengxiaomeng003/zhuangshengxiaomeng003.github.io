@@ -27,18 +27,15 @@ def get_category(code):
         return CATEGORY_MAP[prefix]['category'], CATEGORY_MAP[prefix]['tag']
     return '宽基', 'broad'
 
-# ------------------ 获取日期（改成了只查最近3个月，避免超时） ------------------
-today = datetime.datetime.now().strftime('%Y%m%d')
-cal = pro.trade_cal(exchange='SSE', start_date='20260501', end_date=today)
-cal = cal[cal['is_open'] == 1]['cal_date'].tolist()
+# ------------------ 获取日期（改用Python直接算，不再调接口） ------------------
+today = datetime.datetime.now()
+# 昨天
+yesterday = today - datetime.timedelta(days=1)
+# 前天
+day_before = today - datetime.timedelta(days=2)
 
-if len(cal) >= 2:
-    trade_date = cal[-1]
-    prev_date = cal[-2]
-else:
-    print("⚠️ 交易日数据不足，使用备用日期")
-    trade_date = '20260720'
-    prev_date = '20260717'
+trade_date = yesterday.strftime('%Y%m%d')
+prev_date = day_before.strftime('%Y%m%d')
 
 print(f"📅 正在对比 {trade_date} 和 {prev_date} 的数据...")
 
