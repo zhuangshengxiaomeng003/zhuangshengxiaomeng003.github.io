@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ETF 资金流跟踪平台</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <style>
+        /* ---------- 所有样式保持不变 ---------- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #f0f2f5; color: #1a1a2e; padding: 20px; }
+        .container { max-width: 1440px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); border-radius: 16px; color: #fff; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .header-left .logo { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+        .header-left .logo i { color: #f6c445; margin-right: 10px; }
+        .header-left .subtitle { font-size: 14px; opacity: 0.7; font-weight: 300; margin-left: 6px; }
+        .header-right { display: flex; align-items: center; gap: 20px; font-size: 14px; }
+        .header-right .update-time { opacity: 0.8; }
+        .header-right .update-time i { margin-right: 6px; }
+        .header-right .data-source { background: rgba(255,255,255,0.12); padding: 4px 14px; border-radius: 20px; font-size: 12px; opacity: 0.7; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        @media (min-width: 768px) { .metrics-grid { grid-template-columns: 1fr 1fr 1fr 1fr; } }
+        .metric-card { background: #fff; border-radius: 14px; padding: 18px 22px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: transform 0.2s; }
+        .metric-card:hover { transform: translateY(-2px); }
+        .metric-card .label { font-size: 13px; color: #8c8c8c; margin-bottom: 6px; font-weight: 500; }
+        .metric-card .value { font-size: 28px; font-weight: 700; letter-spacing: -0.3px; }
+        .metric-card .value.positive { color: #e74c3c; }
+        .metric-card .value.negative { color: #3498db; }
+        .metric-card .value.neutral { color: #2d3436; }
+        .metric-card .sub { font-size: 13px; color: #8c8c8c; margin-top: 4px; }
+        .category-nav { display: flex; flex-wrap: wrap; gap: 10px; background: #fff; border-radius: 14px; padding: 16px 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); align-items: center; }
+        .category-nav .nav-label { font-size: 13px; color: #8c8c8c; font-weight: 500; margin-right: 8px; }
+        .category-item { display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 20px; background: #f5f6fa; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+        .category-item:hover { background: #e8eaf6; transform: translateY(-1px); }
+        .category-item.active { border-color: #302b63; background: #f0edff; }
+        .category-item .flow { font-size: 13px; font-weight: 600; }
+        .category-item .flow.pos { color: #e74c3c; }
+        .category-item .flow.neg { color: #3498db; }
+        .category-item .badge { background: #302b63; color: #fff; font-size: 10px; padding: 1px 8px; border-radius: 12px; font-weight: 400; }
+        .chart-section { background: #fff; border-radius: 14px; padding: 20px 24px 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .chart-section .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .chart-section .chart-title { font-size: 18px; font-weight: 600; }
+        .chart-section .chart-title small { font-weight: 400; font-size: 14px; color: #8c8c8c; margin-left: 10px; }
+        .chart-section .chart-legend { display: flex; gap: 18px; font-size: 13px; }
+        .chart-section .chart-legend .dot { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 6px; }
+        .chart-wrapper { position: relative; height: 320px; }
+        .table-section { background: #fff; border-radius: 14px; padding: 20px 24px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow-x: auto; }
+        .table-section .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .table-section .table-title { font-size: 18px; font-weight: 600; }
+        .table-section .table-controls { display: flex; gap: 10px; align-items: center; }
+        .table-section .table-controls select, .table-section .table-controls input { padding: 6px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 13px; background: #fafafa; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        table thead { background: #f8f9fc; border-radius: 8px; }
+        table thead th { padding: 12px 14px; text-align: left; font-weight: 600; color: #555; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; border-bottom: 2px solid #eef0f5; }
+        table tbody td { padding: 12px 14px; border-bottom: 1px solid #f0f0f5; }
+        table tbody tr:hover { background: #fafbff; }
+        .etf-name { font-weight: 500; }
+        .etf-code { color: #8c8c8c; font-size: 12px; font-weight: 400; margin-left: 6px; }
+        .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+        .tag.broad { background: #e8eaf6; color: #3f51b5; }
+        .tag.sector { background: #fce4ec; color: #c62828; }
+        .tag.theme { background: #e0f7fa; color: #00838f; }
+        .tag.cross { background: #fff3e0; color: #e65100; }
+        .tag.commodity { background: #f3e5f5; color: #6a1b9a; }
+        .tag.gold { background: #fef9e7; color: #b7950b; }
+        .flow-positive { color: #e74c3c; font-weight: 600; }
+        .flow-negative { color: #3498db; font-weight: 600; }
+        .flow-neutral { color: #888; }
+        .footer { text-align: center; padding: 20px 0 8px; font-size: 13px; color: #aaa; border-top: 1px solid #eee; margin-top: 12px; }
+        @media (max-width: 640px) { .header { flex-direction: column; align-items: flex-start; padding: 14px 18px; } .header-right { width: 100%; justify-content: space-between; flex-wrap: wrap; } .metric-card .value { font-size: 22px; } .category-item { font-size: 12px; padding: 4px 12px; } .chart-wrapper { height: 240px; } table { font-size: 12px; } table thead th, table tbody td { padding: 8px 10px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ====== 顶栏 ====== -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo"><i class="fas fa-chart-line"></i> ETF 资金流<span class="subtitle">· 份额申赎实时追踪</span></div>
+            </div>
+            <div class="header-right">
+                <span class="update-time"><i class="far fa-calendar-alt"></i> <span id="displayDate">2026-07-20 16:30</span></span>
+                <span class="data-source"><i class="fas fa-database"></i> 数据来源：Wind · Choice · iFind</span>
+            </div>
+        </header>
+
+        <!-- ====== 顶部指标卡 ====== -->
+        <div class="metrics-grid">
+            <div class="metric-card"><div class="label"><i class="fas fa-arrow-right" style="color:#e74c3c;margin-right:4px;"></i> 昨日净流入</div><div class="value positive" id="totalFlow">+634.91 <span style="font-size:18px;font-weight:400;">亿</span></div><div class="sub">较前日 +12.3%</div></div>
+            <div class="metric-card"><div class="label"><i class="fas fa-chart-bar" style="color:#3498db;margin-right:4px;"></i> 近60日净流入</div><div class="value negative" id="totalFlow60">-4,379.22 <span style="font-size:18px;font-weight:400;">亿</span></div><div class="sub">近20日改善 +8.6%</div></div>
+            <div class="metric-card"><div class="label"><i class="fas fa-layer-group" style="color:#6c5ce7;margin-right:4px;"></i> 覆盖ETF总数</div><div class="value neutral" id="totalCount">876 <span style="font-size:18px;font-weight:400;">只</span></div><div class="sub">宽基 42 · 行业 186 · 主题 203</div></div>
+            <div class="metric-card"><div class="label"><i class="fas fa-exchange-alt" style="color:#00b894;margin-right:4px;"></i> 今日份额变动</div><div class="value positive" id="totalShareChange">+12.47 <span style="font-size:18px;font-weight:400;">亿份</span></div><div class="sub">申购 18.2亿 · 赎回 5.73亿</div></div>
+        </div>
+
+        <!-- ====== 分类导航 ====== -->
+        <nav class="category-nav">
+            <span class="nav-label"><i class="fas fa-tags"></i> 分类：</span>
+            <div class="category-item active"><i class="fas fa-chess-board"></i> 宽基 <span class="flow pos">+320.6亿</span><span class="badge">42</span></div>
+            <div class="category-item"><i class="fas fa-industry"></i> 行业 <span class="flow pos">+180.2亿</span><span class="badge">186</span></div>
+            <div class="category-item"><i class="fas fa-lightbulb"></i> 主题 <span class="flow pos">+85.4亿</span><span class="badge">203</span></div>
+            <div class="category-item"><i class="fas fa-globe-asia"></i> 跨境 <span class="flow pos">+32.1亿</span><span class="badge">78</span></div>
+            <div class="category-item"><i class="fas fa-oil-can"></i> 商品 <span class="flow neg">-8.3亿</span><span class="badge">34</span></div>
+            <div class="category-item" style="border-color:#b7950b;background:#fef9e7;"><i class="fas fa-coins" style="color:#b7950b;"></i> 黄金 <span class="flow pos">+9.91亿</span><span class="badge">15</span></div>
+            <div class="category-item"><i class="fas fa-chart-pie"></i> 港股 <span class="flow pos">+15.0亿</span><span class="badge">52</span></div>
+        </nav>
+
+        <!-- ====== 图表 ====== -->
+        <section class="chart-section">
+            <div class="chart-header">
+                <div class="chart-title">宽基ETF申购净流入 <small>叠加上证指数</small></div>
+                <div class="chart-legend"><span><span class="dot" style="background:#e74c3c;"></span>ETF净流入</span><span><span class="dot" style="background:#2d3436;height:2px;border-radius:2px;"></span>上证指数</span></div>
+            </div>
+            <div class="chart-wrapper"><canvas id="flowChart"></canvas></div>
+        </section>
+
+        <!-- ====== 表格 ====== -->
+        <section class="table-section">
+            <div class="table-header">
+                <div class="table-title"><i class="fas fa-list-ul" style="color:#302b63;margin-right:8px;"></i> ETF 份额变动明细 <span style="font-size:14px;font-weight:400;color:#8c8c8c;margin-left:8px;" id="tableDate">2026-07-20</span></div>
+                <div class="table-controls">
+                    <select id="categoryFilter"><option>全部分类</option><option>宽基</option><option>行业</option><option>主题</option><option>跨境</option><option>商品</option><option>黄金</option><option>港股</option></select>
+                    <input type="text" id="searchInput" placeholder="搜索ETF名称或代码..." style="width:160px;" />
+                    <button style="padding:6px 16px;border-radius:8px;border:none;background:#302b63;color:#fff;font-size:13px;cursor:pointer;"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <table>
+                <thead><tr><th>ETF名称 / 代码</th><th>分类</th><th style="text-align:right;">昨日份额<br><span style="font-weight:400;font-size:11px;color:#aaa;">(万份)</span></th><th style="text-align:right;">份额变化<br><span style="font-weight:400;font-size:11px;color:#aaa;">(万份)</span></th><th style="text-align:right;">昨日资金净流入<br><span style="font-weight:400;font-size:11px;color:#aaa;">(万元)</span></th><th style="text-align:right;">近60日净流入<br><span style="font-weight:400;font-size:11px;color:#aaa;">(万元)</span></th><th style="text-align:right;">单位净值</th></tr></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:13px;color:#888;flex-wrap:wrap;gap:8px;">
+                <span>显示 <span id="showCount">0</span> 只ETF</span>
+                <div style="display:flex;gap:6px;">
+                    <button style="padding:4px 14px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;">上一页</button>
+                    <button style="padding:4px 14px;border:1px solid #302b63;border-radius:6px;background:#302b63;color:#fff;cursor:pointer;">1</button>
+                    <button style="padding:4px 14px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;">2</button>
+                    <button style="padding:4px 14px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;">3</button>
+                    <button style="padding:4px 14px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;">下一页</button>
+                </div>
+            </div>
+        </section>
+        <div class="footer"><i class="fas fa-sync-alt" style="margin-right:6px;"></i> 数据每日盘后更新 · 仅供投资参考</div>
+    </div>
+
+    <script>
+        // ================================================================
+        // 1. 备用数据（如果 data.json 没生成，网页会显示这些，让你看到样子）
+        // ================================================================
+        const FALLBACK_DATA = [
+            { name: '沪深300ETF', code: '510300.SH', category: '宽基', categoryTag: 'broad', prevShares: 4823560.00, shareChange: 18420.00, nav: 4.823, flow60d: -1256000.00, flowToday: 88838.46 },
+            { name: '科创50ETF', code: '588000.SH', category: '宽基', categoryTag: 'broad', prevShares: 8532100.00, shareChange: 12650.00, nav: 1.256, flow60d: -342000.00, flowToday: 15888.40 },
+            { name: '中证500ETF', code: '510500.SH', category: '宽基', categoryTag: 'broad', prevShares: 2147800.00, shareChange: 8350.00, nav: 5.892, flow60d: -218000.00, flowToday: 49198.20 },
+            { name: '证券公司ETF', code: '512880.SH', category: '行业', categoryTag: 'sector', prevShares: 9876500.00, shareChange: -21560.00, nav: 1.023, flow60d: 456000.00, flowToday: -22055.88 },
+            { name: '半导体ETF', code: '512480.SH', category: '行业', categoryTag: 'sector', prevShares: 6543200.00, shareChange: 22300.00, nav: 0.876, flow60d: 523000.00, flowToday: 19534.80 },
+            { name: '人工智能ETF', code: '159819.SZ', category: '主题', categoryTag: 'theme', prevShares: 3215600.00, shareChange: 15420.00, nav: 0.934, flow60d: 287000.00, flowToday: 14402.28 },
+            { name: '芯片ETF', code: '159995.SZ', category: '主题', categoryTag: 'theme', prevShares: 4876300.00, shareChange: 18750.00, nav: 1.102, flow60d: 356000.00, flowToday: 20662.50 },
+            { name: '恒生科技ETF', code: '513180.SH', category: '跨境', categoryTag: 'cross', prevShares: 7654300.00, shareChange: 9800.00, nav: 0.567, flow60d: -89000.00, flowToday: 5556.60 },
+            { name: '黄金ETF', code: '518880.SH', category: '黄金', categoryTag: 'gold', prevShares: 2345600.00, shareChange: 3560.00, nav: 5.234, flow60d: 158000.00, flowToday: 18633.04 },
+            { name: '豆粕ETF', code: '159985.SZ', category: '商品', categoryTag: 'commodity', prevShares: 876500.00, shareChange: -1240.00, nav: 2.345, flow60d: -32000.00, flowToday: -2907.80 }
+        ];
+
+        // ================================================================
+        // 2. 核心函数：渲染表格
+        // ================================================================
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">暂无数据</td></tr>';
+                document.getElementById('showCount').innerText = '0';
+                return;
+            }
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                const flowClass = item.flowToday > 0 ? 'flow-positive' : (item.flowToday < 0 ? 'flow-negative' : 'flow-neutral');
+                const flow60dClass = item.flow60d > 0 ? 'flow-positive' : (item.flow60d < 0 ? 'flow-negative' : 'flow-neutral');
+                const changeClass = item.shareChange > 0 ? 'flow-positive' : (item.shareChange < 0 ? 'flow-negative' : 'flow-neutral');
+                tr.innerHTML = `
+                    <td><span class="etf-name">${item.name}</span><span class="etf-code">${item.code}</span></td>
+                    <td><span class="tag ${item.categoryTag}">${item.category}</span></td>
+                    <td style="text-align:right;">${item.prevShares.toLocaleString()}</td>
+                    <td style="text-align:right;font-weight:500;" class="${changeClass}">${item.shareChange > 0 ? '+' : ''}${item.shareChange.toLocaleString()}</td>
+                    <td style="text-align:right;font-weight:600;" class="${flowClass}">${item.flowToday > 0 ? '+' : ''}${item.flowToday.toLocaleString()}</td>
+                    <td style="text-align:right;font-weight:500;" class="${flow60dClass}">${item.flow60d > 0 ? '+' : ''}${item.flow60d.toLocaleString()}</td>
+                    <td style="text-align:right;">${item.nav.toFixed(3)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('showCount').innerText = data.length;
+        }
+
+        // ================================================================
+        // 3. 从 data.json 加载真实数据（如果失败，就用上面的备用数据）
+        // ================================================================
+        let currentData = [];
+
+        async function loadData() {
+            try {
+                const response = await fetch('data.json');
+                if (!response.ok) throw new Error('data.json 不存在或无法读取');
+                const jsonData = await response.json();
+                if (jsonData && jsonData.length > 0) {
+                    currentData = jsonData;
+                    renderTable(currentData);
+                    console.log('✅ 成功加载 data.json 真实数据');
+                    return;
+                } else {
+                    throw new Error('data.json 数据为空');
+                }
+            } catch (error) {
+                console.warn('⚠️ 使用备用数据 (FALLBACK_DATA):', error);
+                currentData = FALLBACK_DATA;
+                renderTable(currentData);
+            }
+        }
+
+        // ================================================================
+        // 4. 分类筛选 & 搜索功能（交互）
+        // ================================================================
+        document.getElementById('categoryFilter').addEventListener('change', function() {
+            const val = this.value;
+            if (val === '全部分类') {
+                renderTable(currentData);
+                return;
+            }
+            const filtered = currentData.filter(item => item.category === val);
+            renderTable(filtered);
+        });
+
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const keyword = this.value.trim().toLowerCase();
+            if (!keyword) {
+                renderTable(currentData);
+                return;
+            }
+            const filtered = currentData.filter(item =>
+                item.name.includes(keyword) ||
+                item.code.toLowerCase().includes(keyword)
+            );
+            renderTable(filtered);
+        });
+
+        // 分类导航点击（同步下拉框）
+        document.querySelectorAll('.category-item').forEach(el => {
+            el.addEventListener('click', function() {
+                document.querySelectorAll('.category-item').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                const text = this.innerText.trim();
+                // 尝试匹配分类
+                const map = { '宽基': '宽基', '行业': '行业', '主题': '主题', '跨境': '跨境', '商品': '商品', '黄金': '黄金', '港股': '港股' };
+                let found = '全部分类';
+                for (let key in map) {
+                    if (text.includes(key)) { found = map[key]; break; }
+                }
+                document.getElementById('categoryFilter').value = found;
+                document.getElementById('categoryFilter').dispatchEvent(new Event('change'));
+            });
+        });
+
+        // ================================================================
+        // 5. 图表（使用模拟数据展示趋势，不会受数据更新影响）
+        // ================================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            // 先加载数据
+            loadData();
+
+            const ctx = document.getElementById('flowChart').getContext('2d');
+            const labels = [];
+            const flowData = [];
+            const indexData = [];
+            let baseFlow = 200;
+            let baseIndex = 3764;
+            const startDate = new Date(2026, 0, 29);
+            const endDate = new Date(2026, 6, 17);
+            const step = 3;
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + step)) {
+                labels.push((d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getDate().toString().padStart(2,'0'));
+                const trend = Math.sin((d-startDate)/(30*24*60*60*1000)*Math.PI*2)*150;
+                const noise = (Math.random()-0.5)*80;
+                flowData.push(Math.round((baseFlow + trend + noise)*10)/10);
+                const progress = (d-startDate)/(endDate-startDate);
+                const idxTrend = -280*Math.sin(progress*Math.PI) + 20*Math.sin(progress*Math.PI*3);
+                const idxNoise = (Math.random()-0.5)*30;
+                indexData.push(Math.round((baseIndex + idxTrend + idxNoise)*10)/10);
+            }
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'ETF净流入 (亿元)',
+                        data: flowData,
+                        backgroundColor: flowData.map(v => v>=0 ? 'rgba(231,76,60,0.65)' : 'rgba(52,152,219,0.65)'),
+                        borderColor: flowData.map(v => v>=0 ? 'rgba(231,76,60,1)' : 'rgba(52,152,219,1)'),
+                        borderWidth: 1,
+                        borderRadius: 2,
+                        order: 2,
+                        yAxisID: 'y',
+                    }, {
+                        label: '上证指数',
+                        data: indexData,
+                        type: 'line',
+                        borderColor: '#2d3436',
+                        backgroundColor: 'rgba(45,52,54,0.08)',
+                        pointRadius: 0,
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.3,
+                        order: 1,
+                        yAxisID: 'y1',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { maxTicksLimit: 16, font: { size: 10 } } },
+                        y: { position: 'left', grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 }, callback: v => v+'亿' } },
+                        y1: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
